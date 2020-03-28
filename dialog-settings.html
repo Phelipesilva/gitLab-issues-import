@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>GitLab Issues</title>
+        <link rel="stylesheet" href="https://ssl.gstatic.com/docs/script/css/add-ons1.css">
+    </head>
+    <style>
+        .full-width {
+            width: 100%;
+        }
+
+        .btn-remove-column {
+            min-width: 30px;
+            width: 30px;
+            height: 30px;
+            border-radius: 15px;
+            margin: 2px 10px;
+        }
+
+        #columns {
+            display: flex;
+            flex-direction: column;
+            max-height: 250px;
+            overflow-y: auto;
+            padding: 0 20px;
+            margin-bottom: 20px;
+        }
+        #columns::-webkit-scrollbar {
+            width: 5px;
+        }
+        #columns::-webkit-scrollbar-track {
+            box-shadow: inset 0 0 5px #ccc; 
+            border-radius: 10px;
+        }
+        #columns::-webkit-scrollbar-thumb {
+            background: #808080CC; 
+            border-radius: 10px;
+        }
+        #columns::-webkit-scrollbar-thumb:hover {
+            background: #808080; 
+        }
+
+        .column-item {
+            align-items: center;
+            display: flex;
+            justify-content: space-between;
+        }
+        .column-item-value {
+            min-width: 150px; 
+            text-align: end; 
+            font-family: monospace; 
+            margin: 0 20px
+        }
+    </style>
+    <body>
+
+        <div style="padding: 0 15px">
+
+            <form id="settings-form">
+
+                <h2>Settings</h2>
+                <hr>
+
+                <div class="form-group full-width">
+                    <label>Host: </label>
+                    <input id="host" class="full-width" type="text" required/>
+                </div>
+
+                <div class="inline form-group"  style="width: 90%">
+                    <label>Token: </label>
+                    <input id="token" class="full-width" type="password" required onblur="handleToken()"/>
+                </div>
+
+                <div class="inline form-group" style="width: 9%; margin: 0;">
+                    <button class="action full-width" style="min-width: 10px" type="button" onclick="handleToken()">Ok</button>
+                </div>
+
+                <hr>
+
+                <div class="form-group full-width">
+                    <label>Group: </label>
+                    <select class="full-width" id="group_id" onchange="handleGroup(event)"></select>
+                </div>
+
+                <div class="form-group full-width">
+                    <label>Project: </label>
+                    <select class="full-width" id="project_id"></select>
+                </div>
+
+                <div class="block inline form-group" style="margin-top: 5px;">
+                    <label>Milestone: </label>
+                    <input id="milestone" class="full-width" type="text" />
+                </div>
+
+                <div class="inline form-group">
+                    <label>State: </label>
+                    <select id="state" type="text">
+                        <option value="all">All</option>
+                        <option value="opened">Opened</option>
+                        <option value="closed">Closed</option>
+                    </select>
+                </div>
+
+                <div class="inline form-group">
+                    <input type="checkbox" id="clear_sheet" checked>
+                    <label for="clear_sheet">Clear Sheet</label>
+                </div>
+
+                <div class="inline form-group">
+                    <input type="checkbox" id="create_headers" checked>
+                    <label for="create_headers">Create Headers</label>
+                </div>
+                
+            </form>
+
+            <form onsubmit="addColumn(event)">
+                
+                <h2>Columns</h2>
+                <hr>
+    
+                <div id="columns"></div>
+
+                <div class="block">
+                    <div class="inline form-group" style="width:300px">
+                        <label>Name: </label>
+                        <input id="column_name" class="full-width" type="text" placeholder="Column name" required/>
+                    </div>
+                    <div class="inline form-group">
+                        <label>Value: </label>
+                        <select id="column_value" type="text">
+                            <option value="iid">Id</option>
+                            <option value="web_url">Web Url</option>
+                            <option value="title">Title</option>
+                            <option value="milestone.title">Milestone Title</option>
+                            <option value="author.name">Author Name</option>
+                            <option value="assignee.name">Assignee Name</option>
+                            <option value="due_date">Due Date</option>
+                        </select>
+                    </div>
+                    <div class="inline block" style="margin-top: 5px;">
+                        <button class="green">Add</button>
+                    </div>
+                    <div class="inline block" style="margin-top: 5px;">
+                        <button id="raw" type="button" onclick="handleRaw()">Raw</button>
+                    </div>
+                </div>
+
+            </form> 
+
+            <div class="block">
+                <div class="inline block" style="margin: 10px 0; display: flex; align-items: center;">
+                    <button class="action" onclick="save()">Save</button>
+                    <button onclick="restore()">Restore Settings</button>
+                    <span id="msg" class="gray" style="margin: 0 50px;"></span>
+                </div>
+                <a href="https://github.com/phelipegustavo/gitlab-issues-import" target="_blank">See docs</a>
+            </div>
+
+        </div>
+        <script>
+
+            var columns = [];
+            var mode = 'columns';
+
+            window.addEventListener('load', function() {
+                google.script.run.withSuccessHandler(renderOptions).getGroups();
+                google.script.run.withSuccessHandler((data) => {
+                    renderOptions(data);
+                    google.script.run.withSuccessHandler(getSettings).getSettings();
+                }).getProjects();
+            })
+
+            function render() {
+                if(mode === 'raw') {
+                    renderRaw();
+                } else {
+                    renderColumns(); 
+                }
+            }
+
+            function addColumn(e) {
+                
+                e.preventDefault();
+
+                var name = document.getElementById('column_name').value;
+                var value = document.getElementById('column_value').value;
+                
+                columns.push({name, value});
+                render();
+            }
+
+            function removeColumn(index) {
+                
+                columns = columns.filter((_, i) => i !== index);
+                render();
+            }
+
+            function handleToken() {
+
+                var $el = document.getElementById('token');
+                var token = $el.value;
+                var $el = document.getElementById('host');
+                var host = $el.value;
+                
+                if(token && host) {
+
+                    google.script.run.withSuccessHandler((settings) => {
+                        google.script.run.withSuccessHandler(renderOptions).getGroups();
+                        google.script.run.withSuccessHandler(renderOptions).getProjects();
+
+                    }).setSettings({
+                        host: host,
+                        options: {
+                            headers: {
+                                'PRIVATE-TOKEN': token,
+                            }
+                        }
+                    });
+                }
+
+            }
+
+            function handleRaw() {
+            
+                var button = document.getElementById('raw');
+                
+                if(mode === 'raw') {
+                    mode = 'columns';
+                    parseJson();
+                    renderColumns();
+                    button.innerHTML = 'Columns';
+                } else {
+                    mode = 'raw';
+                    renderRaw();
+                    button.innerHTML = 'Raw';
+                }
+            }
+
+            function handleGroup(e) {
+                var value = e.target.value;
+                google.script.run.withSuccessHandler(renderOptions).getProjects(value);
+            }
+
+            function renderColumns() {
+            
+                var html = columns.map(function(column, i) {
+                    return `<div class="column-item">
+                        <span style="flex: 1">
+                            <strong>${column.name}</strong>
+                        </span>
+                        <span class="column-item-value">${column.value}</span>
+                        <button 
+                            class="btn-remove-column" 
+                            type="button" 
+                            onclick="removeColumn(${i})"
+                        >X</button>
+                    </div>`;
+                }).join("");
+                
+                var $columns = document.getElementById('columns');
+                $columns.innerHTML = html;
+                
+                mode = 'columns';
+                document.getElementById('raw').innerHTML = 'Raw';
+            }
+
+            function renderOptions(data) {
+                if(!data) return;
+
+                var items = data.items;
+                var id = data.id;
+
+                $select = document.getElementById(id);
+                items = items.map(item => (
+                    `<option value=${item.id}>${item.name}</option>`
+                )).join("");
+
+                $select.innerHTML = items;
+            }
+
+            function renderRaw() {
+            
+                var $columns = document.getElementById('columns');
+                
+                var $json = document.createElement('textarea');
+                $json.setAttribute("id", "json");
+                $json.setAttribute("rows", "15");
+                $json.value = JSON.stringify(columns, null, '\t').replace(/\\n/g, '\n');
+                
+                $columns.innerHTML = '';
+                $columns.appendChild($json);
+            }
+
+            function parseJson() {
+                try {
+                    var $json = document.getElementById('json');
+                    if($json.value) {
+                        columns = JSON.parse($json.value.replace(/\n/g, ''));
+                    }
+                } catch (e) {
+                    setMessage('Could not parse json, check for syntax errors.', 1500);
+                }
+            }
+
+            function setMessage(text, time = false) {
+                var $msg = document.getElementById('msg');
+                $msg.innerHTML = text;
+                if(time) {
+                    setTimeout(() => {
+                        $msg.innerHTML = '';
+                    }, time);
+                }
+            }
+
+            function save(e) {
+                
+                var $form = document.getElementById('settings-form');
+                var valid = $form.reportValidity();
+                
+                if(!valid) return;
+
+                var params = {
+                    'host': '', 
+                    'token': '', 
+                    'group_id': '',
+                    'project_id': '', 
+                    'milestone': '', 
+                    'clear_sheet': '', 
+                    'create_headers': '' ,
+                    'state': '',
+                };
+                
+                Object.keys(params).forEach(param => {
+                    
+                    var $el = document.getElementById(param);
+                    var value = $el.value;
+                    
+                    if($el.type === 'checkbox') {
+                        value = $el.checked;
+                    }
+                    
+                    params[param] = value;
+                });
+                    
+                var settings = {
+                    createHeaders: params.create_headers,
+                    clearSheet: params.clear_sheet,
+                    columns: columns,
+                    host: params.host,
+                    projectId: params.project_id,
+                    options: {
+                        headers: {
+                            'PRIVATE-TOKEN': params.token,
+                        }
+                    },
+                    params: {
+                        milestone: params.milestone,
+                        state: params.state,
+                    }
+                }
+                
+                setMessage('Saving...');
+                google.script.run.withSuccessHandler(() => {
+                    setMessage('Settings successfuly saved', 1500);
+                }).setSettings(settings);
+            }
+
+            function restore() {
+
+                google.script.run.withSuccessHandler(getSettings).restore();
+            }
+
+            function getSettings(settings) {
+                
+                var inputs = {
+                    'host': settings.host, 
+                    'token': settings.options.headers['PRIVATE-TOKEN'], 
+                    'group_id': settings.groupId,
+                    'project_id': settings.projectId, 
+                    'milestone': settings.params.milestone, 
+                    'state': settings.params.state,
+                    'clear_sheet': settings.clearSheet, 
+                    'create_headers': settings.createHeaders
+                };
+            
+                Object.keys(inputs).forEach(param => {
+                    var $el = document.getElementById(param);
+                    
+                    if($el.type == 'checkbox') {
+                        $el.checked = inputs[param];
+                    } else {
+                        $el.value = inputs[param];  
+                    }
+                });
+
+                columns = settings.columns;
+
+                render();
+            }
+        </script>
+    </body>
+</html>
+
