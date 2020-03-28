@@ -44,7 +44,7 @@ The columns have the name and value, the name indicates the header name, and the
 
 In the columns it is possible to add a function where the value can be manipulated, the param received in the function is the value of entry in the specified key, see some examples:
 
-```json
+```javascript
 [
     {
         name: "id",
