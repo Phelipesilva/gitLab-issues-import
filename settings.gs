@@ -95,7 +95,8 @@ function getSettings(key = false) {
             },
             params: {
                 state: 'all',
-                milestone: ''
+                milestone: '',
+                assignee: ''
             }
         }
     } else {

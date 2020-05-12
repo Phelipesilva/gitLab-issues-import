@@ -42,7 +42,9 @@ function fetchData(startPage = 1) {
     var settings = getSettings();
     var url = settings.projectId 
         ? `${settings.host}/api/v4/projects/${settings.projectId}/issues`
-        : `${settings.host}/api/v4/issues`;
+        : settings.groupId 
+            ? `${settings.host}/api/v4/groups/${settings.groupId}/issues`
+            : `${settings.host}/api/v4/issues`;
 
     // first page fetch
     settings.params.page = startPage;

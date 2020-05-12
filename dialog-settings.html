@@ -102,6 +102,15 @@
                         <option value="closed">Closed</option>
                     </select>
                 </div>
+                
+                <div class="inline form-group">
+                    <label>Assignee: </label>
+                    <select id="assignee_id" type="text">
+                        <option value="">All</option>
+                        <option value="none">None</option>
+                        <option value="any">Any</option>
+                    </select>
+                </div>
 
                 <div class="inline form-group">
                     <input type="checkbox" id="clear_sheet" checked>
@@ -330,6 +339,7 @@
                     'clear_sheet': '', 
                     'create_headers': '' ,
                     'state': '',
+                    'assignee_id': '',
                 };
                 
                 Object.keys(params).forEach(param => {
@@ -358,9 +368,10 @@
                     params: {
                         milestone: params.milestone,
                         state: params.state,
+                        assignee_id: params.assignee_id,
                     }
                 }
-                
+
                 setMessage('Saving...');
                 google.script.run.withSuccessHandler(() => {
                     setMessage('Settings successfuly saved', 1500);
@@ -379,6 +390,7 @@
                     'token': settings.options.headers['PRIVATE-TOKEN'], 
                     'group_id': settings.groupId,
                     'project_id': settings.projectId, 
+                    'assignee_id': settings.params.assignee_id,
                     'milestone': settings.params.milestone, 
                     'state': settings.params.state,
                     'clear_sheet': settings.clearSheet, 
